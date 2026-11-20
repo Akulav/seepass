@@ -187,7 +187,7 @@ cargo test
 The Windows setup needs [Inno Setup 6](https://jrsoftware.org/isinfo.php):
 
 ```bash
-iscc /DAppVersion=8.2.0 /DSourceExe=%CD%\target\release\seepass.exe installer\seepass.iss
+iscc /DAppVersion=8.2.1 /DSourceExe=%CD%\target\release\seepass.exe installer\seepass.iss
 ```
 
 To try the UI with fake data and leave your real vault alone:

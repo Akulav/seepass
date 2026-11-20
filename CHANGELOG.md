@@ -7,6 +7,13 @@ section whose heading matches the `Cargo.toml` version as that release's notes.
 
 ## [Unreleased]
 
+## [8.2.1] - 2026-11-20
+
+### Removed
+- The old 7.x installer project (`legacy/SeePassInstaller`) and the prebuilt binaries it carried (the 7.x program,
+  SQLite, Newtonsoft.Json and FontAwesome DLLs). The 7.x source in `legacy/PasswordManager` stays for reference and
+  for the import of old vaults.
+
 ## [8.2.0] - 2026-11-12
 
 ### Added
