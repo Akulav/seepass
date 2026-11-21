@@ -33,7 +33,7 @@ zxcvbn = "3"
 
 # Desktop UI
 eframe = "0.31"
-rfd = "0.15"
+rfd = "0.18"
 arboard = "3"
 
 [dev-dependencies]
