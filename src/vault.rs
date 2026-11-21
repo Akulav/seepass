@@ -245,27 +245,6 @@ impl Vault {
         Ok(report)
     }
 
-    /// Add entries that came from somewhere other than a SeePass 8 vault
-    /// (e.g. the legacy importer). Exact duplicates are skipped.
-    pub fn import_entries(&mut self, entries: Vec<Entry>) -> Result<usize> {
-        let mut added = 0;
-        for e in entries {
-            let dup = self
-                .data
-                .entries
-                .iter()
-                .any(|x| x.title == e.title && x.username == e.username && x.password == e.password);
-            if !dup {
-                self.data.entries.push(e);
-                added += 1;
-            }
-        }
-        if added > 0 {
-            self.save()?;
-        }
-        Ok(added)
-    }
-
     pub fn save(&self) -> Result<()> {
         let json = Zeroizing::new(serde_json::to_vec(&self.data)?);
         let sealed = self.key.seal(&json);

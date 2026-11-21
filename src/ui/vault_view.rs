@@ -28,8 +28,6 @@ pub struct Unlocked {
     pub dialog: Option<Dialog>,
     /// Last deleted entry, offered for undo for a few seconds.
     pub undo: Option<(Entry, Instant)>,
-    #[cfg_attr(not(feature = "legacy-import"), allow(dead_code))]
-    legacy_hint_dismissed: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -80,7 +78,6 @@ impl Unlocked {
             settings_open: false,
             dialog: None,
             undo: None,
-            legacy_hint_dismissed: false,
         }
     }
 
@@ -191,8 +188,6 @@ pub fn show(ctx: &egui::Context, u: &mut Unlocked, shared: &mut Shared) -> Optio
 
     egui::CentralPanel::default().show(ctx, |ui| {
         undo_banner(ui, u, shared);
-        #[cfg(feature = "legacy-import")]
-        legacy_hint(ui, u);
 
         if u.editor.is_some() {
             egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| editor(ui, u, shared));
@@ -352,17 +347,9 @@ fn empty_state(ui: &mut egui::Ui, u: &mut Unlocked, logo: &Option<egui::TextureH
             if ui.add(add).clicked() {
                 u.request(Nav::New);
             }
-            ui.horizontal(|ui| {
-                // Centre the two buttons as a group.
-                ui.add_space((ui.available_width() - 360.0).max(0.0) / 2.0);
-                if ui.button("Import encrypted backup...").clicked() {
-                    dialogs::pick_backup_import(u);
-                }
-                #[cfg(feature = "legacy-import")]
-                if ui.button("Import from SeePass 7...").clicked() {
-                    dialogs::pick_legacy_import(u);
-                }
-            });
+            if ui.button("Import encrypted backup...").clicked() {
+                dialogs::pick_backup_import(u);
+            }
         } else {
             ui.heading(format!("{n} entries"));
             ui.label(
@@ -743,26 +730,4 @@ fn generator_window(ctx: &egui::Context, u: &mut Unlocked, shared: &mut Shared) 
         }
     });
     u.generator.open = open;
-}
-
-#[cfg(feature = "legacy-import")]
-fn legacy_hint(ui: &mut egui::Ui, u: &mut Unlocked) {
-    if u.legacy_hint_dismissed || !u.vault.entries().is_empty() || u.dialog.is_some() {
-        return;
-    }
-    let Some(dir) = seepass::legacy::find_default() else { return };
-    widgets::banner(widgets::ACCENT).show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        ui.label(RichText::new("SeePass 7 data found").strong());
-        ui.label(format!("Your old vault in {} can be imported into this one.", dir.display()));
-        ui.horizontal(|ui| {
-            if ui.button("Import now...").clicked() {
-                u.dialog = Some(Dialog::import_legacy(dir.clone()));
-            }
-            if ui.button("Dismiss").clicked() {
-                u.legacy_hint_dismissed = true;
-            }
-        });
-    });
-    ui.add_space(8.0);
 }

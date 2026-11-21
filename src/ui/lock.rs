@@ -148,17 +148,6 @@ pub fn setup(ctx: &egui::Context, s: &mut SetupState, shared: &mut Shared) -> Op
                 next = Some(Next::Locked);
             }
         }
-        #[cfg(feature = "legacy-import")]
-        if seepass::legacy::find_default().is_some() {
-            ui.label(
-                RichText::new(
-                    "SeePass 7 data was found on this PC. Create your new vault first, then use \
-                     Settings → Import from SeePass 7.",
-                )
-                .small()
-                .color(widgets::ACCENT),
-            );
-        }
     });
     next
 }

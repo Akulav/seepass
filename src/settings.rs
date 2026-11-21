@@ -38,10 +38,6 @@ impl Settings {
 
 /// Where SeePass keeps its files: **the folder it is installed in** (next to the program when not
 /// installed), never the OS's per-user app-data folders. See [`crate::install`].
-///
-/// One exception keeps nobody's vault out of reach: a copy that is *not installed* and has no vault
-/// next to it keeps opening a vault from before 8.2 in the old per-user folder. Installing SeePass
-/// moves that vault into the install folder.
 #[derive(Clone, Debug)]
 pub struct AppPaths {
     pub default_vault: PathBuf,
@@ -50,20 +46,7 @@ pub struct AppPaths {
 
 impl AppPaths {
     pub fn discover() -> Self {
-        let root = crate::install::data_root();
-        if std::env::var_os(crate::install::ENV_DATA_DIR).is_none()
-            && !crate::install::running_installed()
-            && root.as_ref().is_none_or(|r| !r.join("vault.seepass").exists())
-        {
-            let legacy = crate::install::legacy_files();
-            let find = |name: &str| legacy.iter().find(|(_, n)| *n == name).map(|(p, _)| p.clone());
-            if let (Some(vault), Some(settings)) = (find("vault.seepass"), find("settings.json")) {
-                if vault.is_file() {
-                    return Self { default_vault: vault, settings };
-                }
-            }
-        }
-        match root {
+        match crate::install::data_root() {
             Some(r) => Self { default_vault: r.join("vault.seepass"), settings: r.join("settings.json") },
             None => Self { default_vault: "vault.seepass".into(), settings: "seepass-settings.json".into() },
         }

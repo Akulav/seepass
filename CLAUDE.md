@@ -1,16 +1,15 @@
 # CLAUDE.md
 
 Notes for working on **SeePass** (repo `offline-password-manager`, crate `seepass`), an offline password manager made
-by Akulav. It never touches the network for vault data. Rust + eframe. Version 8.x is the Rust rewrite; `legacy/` holds
-the old C# WinForms app (7.x), kept only for reference and import. See `docs/architecture.md`, `docs/security.md`,
-`docs/migrating-from-7.md` and `docs/releasing.md`.
+by Akulav. It never touches the network for vault data. Rust + eframe. Version 8.x is the Rust rewrite of the old C# app (7.x);
+the 7.x importer and source were removed in 8.3.0 (8.2.1 is the last version that imports). See `docs/architecture.md`,
+`docs/security.md` and `docs/releasing.md`.
 
 ## Commands (same as CI)
 
 ```bash
 cargo fmt --all --check
 cargo clippy --locked --all-targets -- -D warnings
-cargo check --locked --no-default-features
 cargo test --locked
 cargo build --locked --release
 cargo run --example demo_vault               # sample vault for screenshots / manual checks
@@ -19,7 +18,7 @@ cargo run --example demo_vault               # sample vault for screenshots / ma
 ## Layout
 
 - `src/crypto.rs` — key derivation (Argon2) and encryption (ChaCha20-Poly1305), `zeroize` for secrets
-- `src/vault.rs` — vault format and storage; `src/legacy.rs` — import of 7.x data (SQLite via `rusqlite`)
+- `src/vault.rs` — vault format and storage
 - `src/generator.rs`, `src/strength.rs` — password generator and strength meter
 - `src/settings.rs`, `src/install.rs`, `src/error.rs`, `src/lib.rs`, `src/main.rs`
 - `src/ui/` — eframe app: `lock.rs`, `vault_view.rs`, `dialogs.rs`, `clipboard.rs`, `install_prompt.rs`, `task.rs`,
@@ -35,8 +34,7 @@ cargo run --example demo_vault               # sample vault for screenshots / ma
   (`src/install.rs`). Don't add HTTP dependencies.
 - Clipboard copies of secrets must keep their auto-clear.
 - Tests use generated throwaway vaults only; never commit a real vault.
-- `legacy/` is reference code with weak crypto by design (it's why 8.x exists). Don't fix it or build on it; only
-  `src/legacy.rs` reads its data.
+- Look: Windows 11 (dark/light, Segoe UI from the Windows fonts folder), in `src/ui/widgets.rs`.
 
 ## graphify
 

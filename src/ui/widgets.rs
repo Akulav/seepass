@@ -5,11 +5,12 @@ use seepass::strength;
 
 use super::Shared;
 
-/// Brand colour, taken from the app icon's gradient.
-pub const ACCENT: Color32 = Color32::from_rgb(84, 88, 240);
-pub const DANGER: Color32 = Color32::from_rgb(225, 75, 85);
-pub const WARNING: Color32 = Color32::from_rgb(230, 160, 40);
-pub const SUCCESS: Color32 = Color32::from_rgb(60, 175, 110);
+/// Windows 11's default accent blue: the main button's fill (white text) in both themes.
+pub const ACCENT: Color32 = Color32::from_rgb(0, 95, 184);
+/// Status colours readable on both themes.
+pub const DANGER: Color32 = Color32::from_rgb(232, 72, 85);
+pub const WARNING: Color32 = Color32::from_rgb(214, 140, 0);
+pub const SUCCESS: Color32 = Color32::from_rgb(56, 158, 72);
 
 /// Avatar colours, picked by hashing the entry title.
 const AVATAR_COLORS: [Color32; 8] = [
@@ -23,53 +24,90 @@ const AVATAR_COLORS: [Color32; 8] = [
     Color32::from_rgb(255, 167, 38),
 ];
 
+/// Windows 11's look, dark or light: flat layers with hairline borders, 4 px controls, 8 px cards, Segoe UI.
 pub fn apply_style(ctx: &egui::Context, dark: bool) {
     let mut v = if dark { egui::Visuals::dark() } else { egui::Visuals::light() };
-    if dark {
-        v.panel_fill = Color32::from_rgb(22, 23, 30);
-        v.window_fill = Color32::from_rgb(30, 31, 40);
-        v.extreme_bg_color = Color32::from_rgb(15, 16, 21);
-        v.faint_bg_color = Color32::from_rgb(33, 35, 46);
-        v.widgets.inactive.weak_bg_fill = Color32::from_rgb(40, 42, 55);
-        v.widgets.inactive.bg_fill = Color32::from_rgb(40, 42, 55);
-        v.widgets.hovered.weak_bg_fill = Color32::from_rgb(52, 55, 72);
-        v.widgets.hovered.bg_fill = Color32::from_rgb(52, 55, 72);
-        v.window_stroke = Stroke::new(1.0_f32, Color32::from_rgb(48, 50, 64));
+    let (base, card, control, hover, border, field) = if dark {
+        (
+            Color32::from_rgb(32, 32, 32),
+            Color32::from_rgb(43, 43, 43),
+            Color32::from_rgb(45, 45, 45),
+            Color32::from_rgb(50, 50, 50),
+            Color32::from_rgb(58, 58, 58),
+            Color32::from_rgb(28, 28, 28),
+        )
     } else {
-        v.panel_fill = Color32::from_rgb(247, 248, 252);
-        v.window_fill = Color32::WHITE;
-        v.extreme_bg_color = Color32::WHITE;
-        v.faint_bg_color = Color32::from_rgb(237, 239, 247);
-        v.widgets.inactive.weak_bg_fill = Color32::from_rgb(232, 234, 243);
-        v.widgets.inactive.bg_fill = Color32::from_rgb(232, 234, 243);
-        v.widgets.hovered.weak_bg_fill = Color32::from_rgb(220, 223, 238);
-        v.widgets.hovered.bg_fill = Color32::from_rgb(220, 223, 238);
-        v.window_stroke = Stroke::new(1.0_f32, Color32::from_rgb(222, 225, 236));
+        (
+            Color32::from_rgb(243, 243, 243),
+            Color32::from_rgb(251, 251, 251),
+            Color32::from_rgb(251, 251, 251),
+            Color32::from_rgb(246, 246, 246),
+            Color32::from_rgb(229, 229, 229),
+            Color32::WHITE,
+        )
+    };
+    v.panel_fill = base;
+    v.window_fill = card;
+    v.extreme_bg_color = field;
+    v.faint_bg_color = card;
+    v.window_stroke = Stroke::new(1.0_f32, border);
+    for (w, fill) in [
+        (&mut v.widgets.noninteractive, card),
+        (&mut v.widgets.inactive, control),
+        (&mut v.widgets.hovered, hover),
+        (&mut v.widgets.active, control),
+        (&mut v.widgets.open, hover),
+    ] {
+        w.bg_fill = fill;
+        w.weak_bg_fill = fill;
+        w.bg_stroke = Stroke::new(1.0_f32, border);
+        w.corner_radius = CornerRadius::same(4);
+        w.expansion = 0.0;
     }
-    v.selection.bg_fill = ACCENT;
-    v.selection.stroke = Stroke::new(1.0_f32, Color32::WHITE);
-    v.hyperlink_color = if dark { Color32::from_rgb(150, 160, 255) } else { ACCENT };
+    let accent = if dark { Color32::from_rgb(96, 205, 255) } else { ACCENT };
+    v.selection.bg_fill = if dark { Color32::from_rgb(0, 120, 212) } else { Color32::from_rgb(153, 201, 239) };
+    v.selection.stroke = Stroke::new(1.0_f32, accent);
+    v.hyperlink_color = accent;
+    v.text_cursor.stroke = Stroke::new(2.0_f32, accent);
     v.window_shadow = egui::Shadow { offset: [0, 8], blur: 24, spread: 0, color: Color32::from_black_alpha(70) };
     v.popup_shadow = egui::Shadow { offset: [0, 4], blur: 12, spread: 0, color: Color32::from_black_alpha(50) };
-    let r = CornerRadius::same(7);
-    for w in [&mut v.widgets.noninteractive, &mut v.widgets.inactive, &mut v.widgets.hovered, &mut v.widgets.active] {
-        w.corner_radius = r;
-    }
-    v.widgets.open.corner_radius = r;
-    v.window_corner_radius = CornerRadius::same(12);
-    v.menu_corner_radius = CornerRadius::same(8);
+    v.window_corner_radius = CornerRadius::same(8);
+    v.menu_corner_radius = CornerRadius::same(4);
     ctx.set_visuals(v);
     ctx.style_mut(|s| {
         s.spacing.item_spacing = egui::vec2(8.0, 8.0);
         s.spacing.button_padding = egui::vec2(12.0, 6.0);
         s.spacing.interact_size.y = 30.0;
         s.spacing.window_margin = egui::Margin::same(16);
-        s.text_styles.insert(TextStyle::Body, FontId::proportional(15.0));
-        s.text_styles.insert(TextStyle::Button, FontId::proportional(15.0));
-        s.text_styles.insert(TextStyle::Heading, FontId::proportional(22.0));
-        s.text_styles.insert(TextStyle::Monospace, FontId::monospace(15.0));
+        s.text_styles.insert(TextStyle::Body, FontId::proportional(14.5));
+        s.text_styles.insert(TextStyle::Button, FontId::proportional(14.5));
+        s.text_styles.insert(TextStyle::Heading, FontId::proportional(24.0));
+        s.text_styles.insert(TextStyle::Monospace, FontId::monospace(14.5));
         s.text_styles.insert(TextStyle::Small, FontId::proportional(12.5));
     });
+}
+
+/// Windows 11's UI font: Segoe UI (and Cascadia Mono / Consolas for passwords) read from the Windows fonts folder,
+/// before egui's own fonts. Other systems keep egui's fonts. Nothing is downloaded.
+pub fn install_fonts(ctx: &egui::Context) {
+    let mut fonts = egui::FontDefinitions::default();
+    let windir = std::env::var_os("WINDIR").unwrap_or_else(|| "C:\\Windows".into());
+    let read = |file: &str| -> Option<Vec<u8>> {
+        if !cfg!(windows) {
+            return None;
+        }
+        std::fs::read(std::path::Path::new(&windir).join("Fonts").join(file)).ok()
+    };
+    for (family, name, files) in [
+        (egui::FontFamily::Proportional, "segoe-ui", &["segoeui.ttf"][..]),
+        (egui::FontFamily::Monospace, "mono", &["CascadiaMono.ttf", "consola.ttf"][..]),
+    ] {
+        if let Some(bytes) = files.iter().find_map(|f| read(f)) {
+            fonts.font_data.insert(name.into(), std::sync::Arc::new(egui::FontData::from_owned(bytes)));
+            fonts.families.entry(family).or_default().insert(0, name.into());
+        }
+    }
+    ctx.set_fonts(fonts);
 }
 
 /// Upload the app icon once so screens can draw it.
@@ -90,7 +128,7 @@ pub fn logo(ui: &mut egui::Ui, logo: &Option<egui::TextureHandle>, size: f32) {
 
 /// Filled accent button for the main action on a screen.
 pub fn primary_button(text: &str) -> egui::Button<'static> {
-    egui::Button::new(RichText::new(text).strong().color(Color32::WHITE)).fill(ACCENT)
+    egui::Button::new(RichText::new(text).strong().color(Color32::WHITE)).fill(ACCENT).stroke(Stroke::NONE)
 }
 
 /// A rounded panel used for the details "cards" and banners.

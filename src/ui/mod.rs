@@ -62,6 +62,7 @@ impl App {
         vault_override: Option<PathBuf>,
         startup: seepass::install::StartupInfo,
     ) -> Self {
+        widgets::install_fonts(&cc.egui_ctx);
         let mut app = Self::with_paths(&cc.egui_ctx, AppPaths::discover(), vault_override);
         app.install = install_prompt::InstallPrompt::new(startup.offer);
         if startup.installed {

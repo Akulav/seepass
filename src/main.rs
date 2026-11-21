@@ -10,7 +10,7 @@ use eframe::egui;
 
 fn main() -> eframe::Result {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    // Install folder, moving a pre-8.2 vault into it, `--uninstall`.
+    // Install folder, `--uninstall`.
     let startup = match seepass::install::on_startup(&args) {
         seepass::install::Startup::Exit => return Ok(()),
         seepass::install::Startup::Run(info) => info,

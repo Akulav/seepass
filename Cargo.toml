@@ -1,28 +1,12 @@
 [package]
 name = "seepass"
-version = "8.2.1"
+version = "8.3.0"
 edition = "2021"
 description = "SeePass - an offline, single-file, authenticated-encryption password manager"
 license-file = "LICENSE"
-repository = "https://github.com/Akulav/offline-password-manager"
+repository = "https://github.com/Akulav/seepass"
 readme = "README.md"
 publish = false
-
-# `cargo deb` (used by the release workflow) builds the Linux .deb from this.
-[package.metadata.deb]
-maintainer = "Akulav <https://github.com/Akulav>"
-section = "utils"
-priority = "optional"
-extended-description = "One portable executable, one encrypted file, no cloud, no telemetry."
-# eframe loads these at runtime, so dpkg-shlibdeps cannot see them.
-depends = "$auto, libgl1, libxkbcommon0, libxkbcommon-x11-0"
-assets = [
-    ["target/release/seepass", "usr/bin/", "755"],
-    ["assets/seepass.desktop", "usr/share/applications/", "644"],
-    ["assets/seepass-256.png", "usr/share/icons/hicolor/256x256/apps/seepass.png", "644"],
-    ["assets/seepass-512.png", "usr/share/icons/hicolor/512x512/apps/seepass.png", "644"],
-    ["README.md", "usr/share/doc/seepass/README.md", "644"],
-]
 
 [[bin]]
 name = "seepass"
@@ -32,11 +16,6 @@ path = "src/main.rs"
 name = "seepass"
 path = "src/lib.rs"
 
-[features]
-default = ["legacy-import"]
-# Import vaults created by SeePass 7.x (C# / SQLite). Pulls in a bundled SQLite.
-legacy-import = ["dep:rusqlite", "dep:aes", "dep:cbc", "dep:pbkdf2", "dep:sha1", "dep:encoding_rs", "dep:zip"]
-
 [dependencies]
 # Vault crypto
 argon2 = "0.5"
@@ -44,24 +23,13 @@ chacha20poly1305 = "0.10"
 rand = "0.8"
 zeroize = { version = "1", features = ["derive"] }
 sha2 = "0.10"
-hmac = "0.12"
 
 # Data
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-base64 = "0.22"
 thiserror = "2"
 directories = "5"
 zxcvbn = "3"
-
-# Legacy (7.x) import
-rusqlite = { version = "0.32", features = ["bundled"], optional = true }
-aes = { version = "0.8", optional = true }
-cbc = { version = "0.1", optional = true }
-pbkdf2 = { version = "0.12", optional = true }
-sha1 = { version = "0.10", optional = true }
-encoding_rs = { version = "0.8", optional = true }
-zip = { version = "2", default-features = false, features = ["deflate"], optional = true }
 
 # Desktop UI
 eframe = "0.31"

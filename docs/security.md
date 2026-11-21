@@ -115,4 +115,4 @@ See the "Security" and "Removed" sections of the [changelog](../CHANGELOG.md#800
 In short, 7.x had no integrity protection. It used one fixed key/IV pair for
 every field, its derivation was 1000 rounds of PBKDF2-SHA1, it stored the
 "vector" through a lossy text encoding, and it needed administrator rights.
-`src/legacy.rs` documents its exact scheme so old vaults can still be imported.
+The 7.x importer shipped up to 8.2.1; it was removed in 8.3.0 along with the 7.x source code.

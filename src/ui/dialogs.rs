@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use eframe::egui::{self, RichText};
 use seepass::crypto::{KdfParams, MasterKey};
-use seepass::vault::{self, Entry, VaultData};
+use seepass::vault::{self, VaultData};
 use seepass::{strength, Result};
 use zeroize::Zeroizing;
 
@@ -33,8 +33,6 @@ pub enum Dialog {
         error: Option<String>,
         task: Option<Task<Result<VaultData>>>,
     },
-    #[cfg_attr(not(feature = "legacy-import"), allow(dead_code))]
-    ImportLegacy(LegacyForm),
     DestroyVault {
         typed: String,
     },
@@ -50,32 +48,6 @@ pub struct PasswordForm {
     error: Option<String>,
 }
 
-#[cfg_attr(not(feature = "legacy-import"), allow(dead_code))]
-pub struct LegacyForm {
-    path: PathBuf,
-    username: String,
-    password: Zeroizing<String>,
-    pim: String,
-    show: bool,
-    error: Option<String>,
-    task: Option<Task<Result<Vec<Entry>>>>,
-}
-
-impl Dialog {
-    #[cfg_attr(not(feature = "legacy-import"), allow(dead_code))]
-    pub fn import_legacy(path: PathBuf) -> Self {
-        Dialog::ImportLegacy(LegacyForm {
-            path,
-            username: String::new(),
-            password: Zeroizing::default(),
-            pim: String::new(),
-            show: false,
-            error: None,
-            task: None,
-        })
-    }
-}
-
 /// Ask for a backup file, then open the import dialog for it.
 pub fn pick_backup_import(u: &mut Unlocked) {
     if let Some(path) = rfd::FileDialog::new()
@@ -86,20 +58,6 @@ pub fn pick_backup_import(u: &mut Unlocked) {
     {
         u.dialog =
             Some(Dialog::ImportBackup { path, password: Zeroizing::default(), show: false, error: None, task: None });
-    }
-}
-
-/// Use the 7.x folder if it exists on this PC, otherwise ask for its `data.zip`.
-#[cfg(feature = "legacy-import")]
-pub fn pick_legacy_import(u: &mut Unlocked) {
-    let picked = seepass::legacy::find_default().or_else(|| {
-        rfd::FileDialog::new()
-            .set_title("Select SeePass 7 export (data.zip)")
-            .add_filter("SeePass 7 export", &["zip"])
-            .pick_file()
-    });
-    if let Some(path) = picked {
-        u.dialog = Some(Dialog::import_legacy(path));
     }
 }
 
@@ -189,10 +147,6 @@ pub fn settings_window(ctx: &egui::Context, u: &mut Unlocked, shared: &mut Share
                     }
                     if ui.button("⬇ Import / merge backup...").clicked() {
                         pick_backup_import(u);
-                    }
-                    #[cfg(feature = "legacy-import")]
-                    if ui.button("⬇ Import from SeePass 7...").clicked() {
-                        pick_legacy_import(u);
                     }
                 });
             });
@@ -370,16 +324,6 @@ pub fn show_dialog(ctx: &egui::Context, u: &mut Unlocked, shared: &mut Shared) -
                 });
             }
 
-            Dialog::ImportLegacy(f) => {
-                #[cfg(feature = "legacy-import")]
-                legacy_dialog(ui, f, &mut u.vault, shared, &mut close);
-                #[cfg(not(feature = "legacy-import"))]
-                {
-                    let _ = f;
-                    close = true;
-                }
-            }
-
             Dialog::DestroyVault { typed } => {
                 ui.heading(RichText::new("Delete this vault?").color(DANGER));
                 ui.label(
@@ -411,7 +355,6 @@ pub fn show_dialog(ctx: &egui::Context, u: &mut Unlocked, shared: &mut Shared) -
         Some(Dialog::ChangePassword(_, t)) => t.is_some(),
         Some(Dialog::ExportBackup { task, .. }) => task.is_some(),
         Some(Dialog::ImportBackup { task, .. }) => task.is_some(),
-        Some(Dialog::ImportLegacy(f)) => f.task.is_some(),
         _ => false,
     };
     if close || (modal.should_close() && !busy) {
@@ -432,59 +375,4 @@ fn validate_new(new: &str, confirm: &str, is_master: bool) -> Option<String> {
         return Some(format!("Use at least {} characters.", strength::MIN_MASTER_LENGTH));
     }
     (new != confirm).then(|| "The passwords do not match.".into())
-}
-
-#[cfg(feature = "legacy-import")]
-fn legacy_dialog(
-    ui: &mut egui::Ui,
-    f: &mut LegacyForm,
-    vault: &mut vault::Vault,
-    shared: &mut Shared,
-    close: &mut bool,
-) {
-    if let Some(result) = task::take(&mut f.task) {
-        match result.and_then(|entries| vault.import_entries(entries)) {
-            Ok(n) => {
-                shared.toast(format!("Imported {n} entries from SeePass 7"));
-                *close = true;
-            }
-            Err(e) => f.error = Some(e.to_string()),
-        }
-    }
-    ui.heading("Import from SeePass 7");
-    ui.label(RichText::new(f.path.display().to_string()).small().monospace());
-    ui.label("Enter the username, password and PIM you used in SeePass 7. The old files are only read, never changed.");
-    ui.add(egui::TextEdit::singleline(&mut f.username).hint_text("SeePass 7 username"));
-    widgets::secret_field(ui, &mut f.password, &mut f.show, "SeePass 7 password");
-    ui.add(egui::TextEdit::singleline(&mut f.pim).hint_text("PIM (100 - 100000)"));
-    widgets::error_label(ui, &f.error);
-    let busy = f.task.is_some();
-    ui.horizontal(|ui| {
-        if ui.add_enabled(!busy, egui::Button::new("Import")).clicked() {
-            match f.pim.trim().parse::<u32>() {
-                Ok(pim) if (100..=100_000).contains(&pim) => {
-                    f.error = None;
-                    let (path, user, pw) = (f.path.clone(), f.username.clone(), f.password.clone());
-                    f.task = Some(Task::spawn(ui.ctx(), move || {
-                        seepass::legacy::LegacySource::load(&path)?.decrypt(&user, &pw, pim)
-                    }));
-                }
-                _ => f.error = Some("The PIM is a number between 100 and 100000.".into()),
-            }
-        }
-        if !busy && ui.button("Choose another file...").clicked() {
-            if let Some(p) = rfd::FileDialog::new()
-                .set_title("Select SeePass 7 export (data.zip)")
-                .add_filter("SeePass 7 export", &["zip"])
-                .pick_file()
-            {
-                f.path = p;
-            }
-        }
-        *close |= ui.add_enabled(!busy, egui::Button::new("Cancel")).clicked();
-        if busy {
-            ui.spinner();
-            ui.label("Decrypting...");
-        }
-    });
 }

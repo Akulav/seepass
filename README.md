@@ -125,8 +125,8 @@ It asks for an install folder (default `~/Applications/SeePass`) and creates `Se
 | E or Enter | Edit selected entry | | Del | Delete (with undo) |
 | Ctrl+S | Save while editing | | Ctrl+L | Lock |
 
-**Coming from SeePass 7?** Create your new vault, then **Settings → Import from SeePass 7**. The old files are only
-read, never modified. See [docs/migrating-from-7.md](docs/migrating-from-7.md).
+**Coming from SeePass 7?** Its importer shipped up to SeePass 8.2.1: install 8.2.1, import there (**Settings → Import
+from SeePass 7**), then update. Newer versions open that vault as it is.
 
 ## 📁 Where your data lives
 
@@ -198,22 +198,22 @@ SEEPASS_HOME=./demo SEEPASS_DEV_PASSWORD=demo-vault-correct-horse-battery cargo 
 ```
 
 (`SEEPASS_DEV_PASSWORD` auto-unlocks **debug builds only**.) Screenshots come from the headless UI tests:
-`SEEPASS_UI_SNAPSHOTS=target/ui cargo test --bin seepass -- --test-threads=1`. `cargo build --no-default-features`
-leaves out the SeePass 7 importer and its bundled SQLite. Debug builds never offer to install themselves.
-
-### Documentation
-
-- [Security design & threat model](docs/security.md)
-- [Architecture](docs/architecture.md)
-- [Releasing](docs/releasing.md)
-- [Migrating from SeePass 7](docs/migrating-from-7.md)
+`SEEPASS_UI_SNAPSHOTS=target/ui cargo test --bin seepass -- --test-threads=1`. Debug builds never offer to install
+themselves.
 
 </details>
 
+## 📚 Documentation
+
+- [docs/security.md](docs/security.md): security design and threat model
+- [docs/architecture.md](docs/architecture.md): how it works inside and where each piece of the code lives
+- [docs/releasing.md](docs/releasing.md): publishing a release
+- [CHANGELOG.md](CHANGELOG.md): what changed in each version
+
 ## 🙏 Credits
 
-Built with [egui](https://github.com/emilk/egui), RustCrypto's Argon2 and ChaCha20-Poly1305, and zxcvbn. The SeePass
-name and icon are part of the project.
+Built with [egui](https://github.com/emilk/egui), RustCrypto's Argon2 and ChaCha20-Poly1305, and zxcvbn. On Windows it
+uses the system's Segoe UI. The SeePass name and icon are part of the project.
 
 ---
 

@@ -10,8 +10,7 @@
 //!   offers to update that folder.
 //!
 //! **Files go there.** The install folder holds the program *and* its files (the vault, its `.bak`,
-//! settings). A [`MARKER`] file identifies an install folder. A vault and settings left in the
-//! pre-8.2 per-user folders are moved in on the first start of the installed copy, across drives too.
+//! settings). A [`MARKER`] file identifies an install folder.
 
 use std::path::{Path, PathBuf};
 
@@ -36,21 +35,6 @@ pub const ENV_DATA_DIR: &str = "SEEPASS_HOME";
 const ENV_PORTABLE: &str = "SEEPASS_PORTABLE";
 
 pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-/// Files of versions before 8.2, in the per-user folders: (file, name in the install folder).
-pub fn legacy_files() -> Vec<(PathBuf, &'static str)> {
-    let Some(d) = directories::ProjectDirs::from("", "", "SeePass") else { return Vec::new() };
-    vec![
-        (d.data_dir().join("vault.seepass"), "vault.seepass"),
-        (d.data_dir().join("vault.seepass.bak"), "vault.seepass.bak"),
-        (d.config_dir().join("settings.json"), "settings.json"),
-    ]
-}
-
-fn legacy_dirs() -> Vec<PathBuf> {
-    let Some(d) = directories::ProjectDirs::from("", "", "SeePass") else { return Vec::new() };
-    vec![d.data_dir().to_path_buf(), d.config_dir().to_path_buf()]
-}
 
 fn home_dir() -> Option<PathBuf> {
     directories::BaseDirs::new().map(|b| b.home_dir().to_path_buf())
@@ -126,11 +110,7 @@ pub fn data_root() -> Option<PathBuf> {
     installed_root().or_else(program_root)
 }
 
-/// True for an installed copy (it never uses the pre-8.2 folders).
-pub fn running_installed() -> bool {
-    program_root().is_some_and(|r| is_install_root(&r))
-}
-
+#[cfg_attr(windows, allow(dead_code))]
 fn same_path(a: &Path, b: &Path) -> bool {
     let canon = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
     let (a, b) = (canon(a), canon(b));
@@ -181,46 +161,6 @@ pub fn is_newer(a: &str, b: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Moving the old vault into the install folder
-// ---------------------------------------------------------------------------------------------
-
-/// Move a file: a rename, or across drives a copy (checked to be complete) and then delete. A
-/// failed copy leaves the original untouched.
-pub fn move_file(src: &Path, dst: &Path) -> std::io::Result<()> {
-    if let Some(p) = dst.parent() {
-        std::fs::create_dir_all(p)?;
-    }
-    if std::fs::rename(src, dst).is_ok() {
-        return Ok(());
-    }
-    let copied = std::fs::copy(src, dst)?;
-    if copied != std::fs::metadata(src)?.len() || std::fs::read(src)? != std::fs::read(dst)? {
-        let _ = std::fs::remove_file(dst);
-        return Err(std::io::Error::other("the copy is incomplete"));
-    }
-    std::fs::remove_file(src)
-}
-
-/// Vault, backup and settings of versions before 8.2 → the install folder.
-fn migrate_legacy_data(root: &Path) -> Vec<String> {
-    let mut notes = Vec::new();
-    for (src, name) in legacy_files() {
-        let dst = root.join(name);
-        if !src.is_file() || dst.exists() || same_path(&src, &dst) {
-            continue;
-        }
-        match move_file(&src, &dst) {
-            Ok(()) => notes.push(format!("moved {} to {}", src.display(), dst.display())),
-            Err(e) => notes.push(format!("could not move {} ({e}); it was left there", src.display())),
-        }
-    }
-    for d in legacy_dirs() {
-        let _ = std::fs::remove_dir(d); // only when nothing else is left
-    }
-    notes
-}
-
-// ---------------------------------------------------------------------------------------------
 // Startup
 // ---------------------------------------------------------------------------------------------
 
@@ -242,7 +182,6 @@ pub enum Offer {
 pub struct StartupInfo {
     pub installed: bool,
     pub offer: Offer,
-    pub notes: Vec<String>,
 }
 
 pub enum Startup {
@@ -270,9 +209,6 @@ pub fn on_startup(args: &[String]) -> Startup {
     let mut info = StartupInfo { installed: flag("--installed"), ..Default::default() };
     if let Some(root) = program_root().filter(|r| is_install_root(r)) {
         platform::on_installed_start(&root);
-        if std::env::var_os(ENV_DATA_DIR).is_none() {
-            info.notes = migrate_legacy_data(&root);
-        }
     } else if !cfg!(debug_assertions) && !flag("--here") && !portable() {
         info.offer = platform::startup_offer();
     }
@@ -652,17 +588,6 @@ mod tests {
         } else {
             assert_eq!(parse_install_dir(" /opt/x ").unwrap(), PathBuf::from("/opt/x"));
         }
-    }
-
-    #[test]
-    fn moves_files_completely() {
-        let d = tempfile::tempdir().unwrap();
-        let (src, dst) = (d.path().join("a/vault.seepass"), d.path().join("b/vault.seepass"));
-        std::fs::create_dir_all(src.parent().unwrap()).unwrap();
-        std::fs::write(&src, b"secret bytes").unwrap();
-        move_file(&src, &dst).unwrap();
-        assert_eq!(std::fs::read(&dst).unwrap(), b"secret bytes");
-        assert!(!src.exists());
     }
 
     #[cfg(unix)]

@@ -20,8 +20,6 @@ pub enum Error {
     Io(#[from] io::Error),
     #[error("vault data is malformed: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("legacy import failed: {0}")]
-    Legacy(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

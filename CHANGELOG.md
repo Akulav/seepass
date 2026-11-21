@@ -7,6 +7,21 @@ section whose heading matches the `Cargo.toml` version as that release's notes.
 
 ## [Unreleased]
 
+## [8.3.0] - 2026-11-21
+
+### Changed
+- **New look:** Windows 11's style in both themes: a flat window background, card layers with hairline borders,
+  the Windows accent blue for the main button, 4 px controls and 8 px cards, and Segoe UI (Cascadia Mono for
+  passwords) read from Windows' own fonts. Other systems keep egui's fonts. Nothing is downloaded.
+- The repository is now `Akulav/seepass`.
+
+### Removed
+- **Import from SeePass 7** and the 7.x C# source it was based on (with its bundled SQLite and old-crypto
+  dependencies). To bring a 7.x vault over, install 8.2.1, import there, then update.
+- Moving a vault and settings from the per-user folders of versions before 8.2 into the install folder. Update to
+  8.2.1 first if you still have them there.
+- The unused Debian packaging metadata and the leftover `.desktop` / 512 px icon files.
+
 ## [8.2.1] - 2026-11-20
 
 ### Removed
