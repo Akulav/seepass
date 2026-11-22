@@ -1,4 +1,4 @@
-//! Settings window and modal dialogs (delete, change password, backups, import).
+//! Settings page and modal dialogs (delete, change password, backups, import).
 
 use std::path::PathBuf;
 
@@ -65,61 +65,96 @@ fn section(ui: &mut egui::Ui, title: &str, add: impl FnOnce(&mut egui::Ui)) {
     ui.label(RichText::new(title).small().strong().weak());
     widgets::card(ui).show(ui, |ui| {
         ui.set_width(ui.available_width());
+        ui.spacing_mut().item_spacing.y = 4.0;
         add(ui);
     });
-    ui.add_space(6.0);
+    ui.add_space(10.0);
 }
 
-pub fn settings_window(ctx: &egui::Context, u: &mut Unlocked, shared: &mut Shared) -> Option<Next> {
-    let mut open = u.settings_open;
-    let max_h = (ctx.screen_rect().height() - 120.0).max(240.0);
-    egui::Window::new("⚙ Settings")
-        .open(&mut open)
-        .resizable(false)
-        .default_width(440.0)
-        .max_height(max_h)
-        .vscroll(true)
-        .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 56.0))
-        .show(ctx, |ui| {
+/// One setting: name and a short hint on the left, its control lined up on the right edge.
+fn setting_row(ui: &mut egui::Ui, label: &str, hint: &str, control: impl FnOnce(&mut egui::Ui)) {
+    ui.horizontal(|ui| {
+        ui.set_min_height(44.0);
+        ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing.y = 2.0;
+            ui.add_space(4.0);
+            ui.label(label);
+            if !hint.is_empty() {
+                ui.label(RichText::new(hint).small().weak());
+            }
+        });
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), control);
+    });
+}
+
+/// Same-width buttons on the right of a settings row.
+fn row_button(ui: &mut egui::Ui, text: impl Into<egui::WidgetText>) -> egui::Response {
+    ui.add(egui::Button::new(text).min_size(egui::vec2(230.0, 32.0)))
+}
+
+/// The settings page, shown in the main area in place of an entry. Three tabs, each short enough to fit without
+/// scrolling.
+pub fn settings_page(ui: &mut egui::Ui, u: &mut Unlocked, shared: &mut Shared) {
+    let ctx = ui.ctx().clone();
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        ui.vertical(|ui| {
+            ui.label(RichText::new("Settings").heading().strong());
+            ui.label(RichText::new("Changes are saved right away.").small().weak());
+        });
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui.add(egui::Button::new("✖ Close").min_size(egui::vec2(0.0, 32.0))).clicked() {
+                u.settings_open = false;
+            }
+        });
+    });
+    ui.add_space(10.0);
+    widgets::tab_strip(ui, &["General", "Backup", "Vault file"], &mut u.settings_tab);
+    ui.add_space(10.0);
+    egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
+        if u.settings_tab == 0 {
             section(ui, "APPEARANCE", |ui| {
-                ui.horizontal(|ui| {
-                    ui.label("Theme");
+                setting_row(ui, "Theme", "Windows 11 dark or light", |ui| {
                     let mut dark = shared.settings.dark_mode;
-                    ui.selectable_value(&mut dark, true, "🌙 Dark");
-                    ui.selectable_value(&mut dark, false, "☀ Light");
+                    // Right-to-left, so Light is added first.
+                    if widgets::toggle_button(ui, !dark, "☀ Light").clicked() {
+                        dark = false;
+                    }
+                    if widgets::toggle_button(ui, dark, "🌙 Dark").clicked() {
+                        dark = true;
+                    }
                     if dark != shared.settings.dark_mode {
                         shared.settings.dark_mode = dark;
-                        widgets::apply_style(ctx, dark);
+                        widgets::apply_style(&ctx, dark);
                         shared.save_settings();
                     }
                 });
             });
 
             section(ui, "SECURITY", |ui| {
-                let mut lock_min = shared.settings.auto_lock_secs / 60;
-                egui::Grid::new("security").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
-                    ui.label("Auto-lock after");
-                    ui.horizontal(|ui| {
-                        let r = ui.add(egui::DragValue::new(&mut lock_min).range(0..=240).suffix(" min"));
-                        ui.label(RichText::new("0 = never").small().weak());
-                        if r.changed() {
-                            shared.settings.auto_lock_secs = lock_min * 60;
-                            shared.save_settings();
-                        }
-                    });
-                    ui.end_row();
-                    ui.label("Clear clipboard after");
-                    ui.horizontal(|ui| {
-                        let r = ui.add(
+                setting_row(ui, "Auto-lock after", "Locks the vault when you step away. 0 = never", |ui| {
+                    let mut lock_min = shared.settings.auto_lock_secs / 60;
+                    let r =
+                        ui.add_sized([110.0, 30.0], egui::DragValue::new(&mut lock_min).range(0..=240).suffix(" min"));
+                    if r.changed() {
+                        shared.settings.auto_lock_secs = lock_min * 60;
+                        shared.save_settings();
+                    }
+                });
+                setting_row(
+                    ui,
+                    "Clear clipboard after",
+                    "Copied passwords are wiped from the clipboard. 0 = never",
+                    |ui| {
+                        let r = ui.add_sized(
+                            [110.0, 30.0],
                             egui::DragValue::new(&mut shared.settings.clipboard_clear_secs).range(0..=600).suffix(" s"),
                         );
-                        ui.label(RichText::new("0 = never").small().weak());
                         if r.changed() {
                             shared.save_settings();
                         }
-                    });
-                    ui.end_row();
-                });
+                    },
+                );
                 let p = u.vault.kdf_params();
                 let mem = if p.m_cost_kib >= 1024 {
                     format!("{} MiB", p.m_cost_kib / 1024)
@@ -127,31 +162,45 @@ pub fn settings_window(ctx: &egui::Context, u: &mut Unlocked, shared: &mut Share
                     format!("{} KiB", p.m_cost_kib)
                 };
                 let passes = if p.t_cost == 1 { "1 pass".to_string() } else { format!("{} passes", p.t_cost) };
-                ui.label(RichText::new(format!("Key derivation: Argon2id, {mem}, {passes}")).small().weak());
-                if ui.button("🔑 Change master password...").clicked() {
-                    u.dialog = Some(Dialog::ChangePassword(PasswordForm::default(), None));
-                }
-            });
-
-            section(ui, "BACKUP & IMPORT", |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    if ui.button("⬆ Export encrypted backup...").clicked() {
-                        if let Some(path) = rfd::FileDialog::new()
-                            .set_title("Export encrypted backup")
-                            .set_file_name("seepass-backup.seepass")
-                            .add_filter("SeePass vault", &["seepass"])
-                            .save_file()
-                        {
-                            u.dialog = Some(Dialog::ExportBackup { path, form: PasswordForm::default(), task: None });
-                        }
+                let kdf = format!("Key derivation: Argon2id, {mem}, {passes}");
+                setting_row(ui, "Master password", &kdf, |ui| {
+                    if row_button(ui, "🔑 Change master password...").clicked() {
+                        u.dialog = Some(Dialog::ChangePassword(PasswordForm::default(), None));
                     }
-                    if ui.button("⬇ Import / merge backup...").clicked() {
+                });
+            });
+        }
+        if u.settings_tab == 1 {
+            section(ui, "BACKUP & IMPORT", |ui| {
+                setting_row(
+                    ui,
+                    "Export",
+                    "Save a copy of the vault, encrypted with a password you choose for it",
+                    |ui| {
+                        if row_button(ui, "⬆ Export encrypted backup...").clicked() {
+                            if let Some(path) = rfd::FileDialog::new()
+                                .set_title("Export encrypted backup")
+                                .set_file_name("seepass-backup.seepass")
+                                .add_filter("SeePass vault", &["seepass"])
+                                .save_file()
+                            {
+                                u.dialog =
+                                    Some(Dialog::ExportBackup { path, form: PasswordForm::default(), task: None });
+                            }
+                        }
+                    },
+                );
+                ui.separator();
+                setting_row(ui, "Import", "Merge the entries of a backup or another vault into this one", |ui| {
+                    if row_button(ui, "⬇ Import / merge backup...").clicked() {
                         pick_backup_import(u);
                     }
                 });
             });
-
+        }
+        if u.settings_tab == 2 {
             section(ui, "VAULT FILE", |ui| {
+                ui.add_space(4.0);
                 ui.add(
                     egui::Label::new(RichText::new(u.vault.path().display().to_string()).small().monospace()).wrap(),
                 );
@@ -163,20 +212,26 @@ pub fn settings_window(ctx: &egui::Context, u: &mut Unlocked, shared: &mut Share
                     .small()
                     .weak(),
                 );
+                ui.add_space(4.0);
             });
 
             ui.label(RichText::new("DANGER ZONE").small().strong().color(DANGER));
             widgets::banner(DANGER).show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                if ui.button(RichText::new("🗑 Delete this vault...").color(DANGER)).clicked() {
-                    u.dialog = Some(Dialog::DestroyVault { typed: String::new() });
-                }
+                setting_row(
+                    ui,
+                    "Delete this vault",
+                    "Removes the vault file and its backup. This can't be undone.",
+                    |ui| {
+                        if row_button(ui, RichText::new("🗑 Delete this vault...").color(DANGER)).clicked() {
+                            u.dialog = Some(Dialog::DestroyVault { typed: String::new() });
+                        }
+                    },
+                );
             });
-        });
-    u.settings_open = open;
-    None
+        }
+    });
 }
-
 pub fn show_dialog(ctx: &egui::Context, u: &mut Unlocked, shared: &mut Shared) -> Option<Next> {
     let dialog = u.dialog.as_mut()?;
     let mut close = false;

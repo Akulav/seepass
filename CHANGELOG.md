@@ -7,6 +7,14 @@ section whose heading matches the `Cargo.toml` version as that release's notes.
 
 ## [Unreleased]
 
+## [8.4.0] - 2026-11-22
+
+### Changed
+- **Settings is a page, not a pop-up window:** it opens in the main area with three tabs (General, Backup, Vault file),
+  every setting on its own row with its control lined up on the right. Picking an entry or pressing New leaves it.
+- **Centred entry details and editor:** they sit in a centred column instead of stretching across a wide window.
+- **Tidier buttons:** the toolbar toggles, show/hide and generate buttons, and the website's Open button are now
+  framed buttons of the same height, lined up with the Copy buttons.
 ## [8.3.0] - 2026-11-21
 
 ### Changed

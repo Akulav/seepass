@@ -25,6 +25,7 @@ pub struct Unlocked {
     reveal: bool,
     generator: Generator,
     pub settings_open: bool,
+    pub settings_tab: usize,
     pub dialog: Option<Dialog>,
     /// Last deleted entry, offered for undo for a few seconds.
     pub undo: Option<(Entry, Instant)>,
@@ -76,6 +77,7 @@ impl Unlocked {
             reveal: false,
             generator: Generator { open: false, opts, output: generator::generate(&opts).unwrap_or_default() },
             settings_open: false,
+            settings_tab: 0,
             dialog: None,
             undo: None,
         }
@@ -93,6 +95,7 @@ impl Unlocked {
     pub fn apply(&mut self, nav: Nav) {
         self.reveal = false;
         self.editor = None;
+        self.settings_open = false;
         match nav {
             Nav::Select(id) => self.selected = id,
             Nav::New => {
@@ -171,10 +174,10 @@ pub fn show(ctx: &egui::Context, u: &mut Unlocked, shared: &mut Shared) -> Optio
                 if ui.button("🔒 Lock").on_hover_text("Lock now (Ctrl+L)").clicked() {
                     next = Some(Next::Locked);
                 }
-                if ui.selectable_label(u.settings_open, "⚙ Settings").clicked() {
+                if widgets::toggle_button(ui, u.settings_open, "⚙ Settings").clicked() {
                     u.settings_open = !u.settings_open;
                 }
-                if ui.selectable_label(u.generator.open, "🎲 Generator").clicked() {
+                if widgets::toggle_button(ui, u.generator.open, "🎲 Generator").clicked() {
                     u.generator.open = !u.generator.open;
                 }
                 if ui.add(widgets::primary_button("➕ New")).on_hover_text("Add an entry (Ctrl+N)").clicked() {
@@ -189,19 +192,23 @@ pub fn show(ctx: &egui::Context, u: &mut Unlocked, shared: &mut Shared) -> Optio
     egui::CentralPanel::default().show(ctx, |ui| {
         undo_banner(ui, u, shared);
 
-        if u.editor.is_some() {
-            egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| editor(ui, u, shared));
+        if u.settings_open {
+            widgets::centered(ui, 860.0, |ui| dialogs::settings_page(ui, u, shared));
+        } else if u.editor.is_some() {
+            widgets::centered(ui, 960.0, |ui| {
+                egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| editor(ui, u, shared));
+            });
         } else if let Some(id) = u.selected.clone() {
-            egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| details(ui, u, shared, &id));
+            widgets::centered(ui, 960.0, |ui| {
+                egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| details(ui, u, shared, &id));
+            });
         } else {
             empty_state(ui, u, &shared.logo);
         }
     });
 
     generator_window(ctx, u, shared);
-    if let Some(n) = dialogs::settings_window(ctx, u, shared) {
-        next = Some(n);
-    }
+
     if let Some(n) = dialogs::show_dialog(ctx, u, shared) {
         next = Some(n);
     }
@@ -514,7 +521,9 @@ fn details(ui: &mut egui::Ui, u: &mut Unlocked, shared: &mut Shared, id: &str) {
                 if ui.button("📋 Copy").on_hover_text("Ctrl+C").clicked() {
                     shared.copy_secret("Password", &entry.password);
                 }
-                if ui.selectable_label(u.reveal, "👁").on_hover_text(if u.reveal { "Hide" } else { "Reveal" }).clicked()
+                if widgets::icon_toggle(ui, u.reveal, "👁")
+                    .on_hover_text(if u.reveal { "Hide" } else { "Reveal" })
+                    .clicked()
                 {
                     u.reveal = !u.reveal;
                 }
@@ -530,7 +539,9 @@ fn details(ui: &mut egui::Ui, u: &mut Unlocked, shared: &mut Shared, id: &str) {
                 ui.label(&entry.url);
             },
             |ui| {
-                ui.hyperlink_to("Open ↗", &url);
+                if ui.add(egui::Button::new("↗ Open").min_size(egui::vec2(0.0, 30.0))).on_hover_text(&url).clicked() {
+                    ui.ctx().open_url(egui::OpenUrl::new_tab(&url));
+                }
             },
         );
     }
@@ -619,12 +630,12 @@ fn editor(ui: &mut egui::Ui, u: &mut Unlocked, shared: &mut Shared) {
             egui::TextEdit::singleline(&mut ed.draft.password)
                 .password(!ed.show_password)
                 .font(egui::TextStyle::Monospace)
-                .desired_width(w - 84.0),
+                .desired_width(w - 2.0 * (widgets::ICON_BTN + 8.0)),
         );
-        if ui.selectable_label(ed.show_password, "👁").on_hover_text("Show / hide").clicked() {
+        if widgets::icon_toggle(ui, ed.show_password, "👁").on_hover_text("Show / hide").clicked() {
             ed.show_password = !ed.show_password;
         }
-        if ui.button("🎲").on_hover_text("Generate (uses the generator's settings)").clicked() {
+        if widgets::icon_button(ui, "🎲").on_hover_text("Generate (uses the generator's settings)").clicked() {
             if let Some(pw) = generator::generate(&u.generator.opts) {
                 ed.draft.password = pw.to_string();
                 ed.show_password = true;

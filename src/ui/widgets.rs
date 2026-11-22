@@ -139,6 +139,78 @@ pub fn card(ui: &egui::Ui) -> egui::Frame {
         .inner_margin(egui::Margin::symmetric(14, 10))
 }
 
+/// Run `add` in a column at most `max_w` wide, centred in the space that is left: pages grow with the window up to
+/// that width and stay centred beyond it.
+pub fn centered(ui: &mut egui::Ui, max_w: f32, add: impl FnOnce(&mut egui::Ui)) {
+    let avail = ui.available_rect_before_wrap();
+    let w = avail.width().min(max_w);
+    let rect =
+        egui::Rect::from_min_size(egui::pos2(avail.center().x - w / 2.0, avail.top()), egui::vec2(w, avail.height()));
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rect), add);
+    ui.allocate_rect(avail, egui::Sense::hover());
+}
+
+/// Windows 11 style tab strip: equal tabs in a flat bar, the current one lifted and marked with the accent.
+/// Returns true when the selection changed.
+pub fn tab_strip(ui: &mut egui::Ui, tabs: &[&str], current: &mut usize) -> bool {
+    let h = 34.0;
+    let (bar, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), h + 8.0), egui::Sense::hover());
+    let v = ui.visuals().clone();
+    let accent = v.hyperlink_color;
+    ui.painter().rect(bar, CornerRadius::same(8), v.extreme_bg_color, v.window_stroke, egui::StrokeKind::Inside);
+    let inner = bar.shrink(4.0);
+    let n = tabs.len().max(1) as f32;
+    let w = (inner.width() - 4.0 * (n - 1.0)) / n;
+    let mut changed = false;
+    for (i, label) in tabs.iter().enumerate() {
+        let r =
+            egui::Rect::from_min_size(egui::pos2(inner.left() + i as f32 * (w + 4.0), inner.top()), egui::vec2(w, h));
+        let resp = ui.interact(r, ui.id().with(("tab", i)), egui::Sense::click());
+        let on = *current == i;
+        let fill = if on {
+            v.widgets.inactive.bg_fill
+        } else if resp.hovered() {
+            v.widgets.hovered.bg_fill
+        } else {
+            Color32::TRANSPARENT
+        };
+        ui.painter().rect_filled(r, CornerRadius::same(4), fill);
+        if on {
+            let line = egui::Rect::from_min_max(
+                egui::pos2(r.center().x - 14.0, r.bottom() - 3.0),
+                egui::pos2(r.center().x + 14.0, r.bottom()),
+            );
+            ui.painter().rect_filled(line, CornerRadius::same(2), accent);
+        }
+        let color = if on || resp.hovered() { v.strong_text_color() } else { v.text_color() };
+        ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, *label, FontId::proportional(14.5), color);
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, *label));
+        if resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked() && !on {
+            *current = i;
+            changed = true;
+        }
+    }
+    changed
+}
+
+/// Width of the square icon buttons (show/hide, generate), so rows next to them line up.
+pub const ICON_BTN: f32 = 32.0;
+
+/// A framed button that stays highlighted while `on` (toolbar toggles, theme choice).
+pub fn toggle_button(ui: &mut egui::Ui, on: bool, text: &str) -> egui::Response {
+    ui.add(egui::Button::new(text).selected(on).min_size(egui::vec2(0.0, 30.0)))
+}
+
+/// A square framed icon button.
+pub fn icon_button(ui: &mut egui::Ui, icon: &str) -> egui::Response {
+    ui.add(egui::Button::new(icon).min_size(egui::vec2(ICON_BTN, 30.0)))
+}
+
+/// A square framed icon button that stays highlighted while `on` (show / hide).
+pub fn icon_toggle(ui: &mut egui::Ui, on: bool, icon: &str) -> egui::Response {
+    ui.add(egui::Button::new(icon).selected(on).min_size(egui::vec2(ICON_BTN, 30.0)))
+}
+
 pub fn banner(color: Color32) -> egui::Frame {
     egui::Frame::new()
         .fill(color.gamma_multiply(0.18))
@@ -220,10 +292,10 @@ pub fn entry_row(ui: &mut egui::Ui, selected: bool, title: &str, user: &str, fav
 /// Single-line password field with a show/hide toggle.
 pub fn secret_field(ui: &mut egui::Ui, value: &mut String, shown: &mut bool, hint: &str) -> egui::Response {
     // Measure before entering the row so stacked fields line up exactly.
-    let width = ui.available_width() - 40.0;
+    let width = ui.available_width() - ICON_BTN - 8.0;
     ui.horizontal(|ui| {
         let resp = ui.add(egui::TextEdit::singleline(value).password(!*shown).hint_text(hint).desired_width(width));
-        if ui.selectable_label(*shown, "👁").on_hover_text(if *shown { "Hide" } else { "Show" }).clicked() {
+        if icon_toggle(ui, *shown, "👁").on_hover_text(if *shown { "Hide" } else { "Show" }).clicked() {
             *shown = !*shown;
         }
         resp

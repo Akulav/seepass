@@ -213,7 +213,7 @@ fn delete_then_undo() {
 }
 
 #[test]
-fn settings_window_and_lock() {
+fn settings_page_and_lock() {
     let f = demo();
     let mut h = harness(f.paths.clone());
     unlock(&mut h);
